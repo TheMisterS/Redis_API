@@ -60,6 +60,10 @@ public class Client {
             return false;
         }
     }
+
+    public double getMeterValue (String meterID){
+        return this.meters(meterID);
+    }
 /* WIP
     public void removeMeter(String meterID){
         return this.meters.remove(meterID);

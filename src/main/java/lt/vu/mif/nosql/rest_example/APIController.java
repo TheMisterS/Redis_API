@@ -71,4 +71,12 @@ public class APIController {
 
     }
 
+
+    @PostMapping("/{id}/meter/{meterId}/add")
+    public ResponseEntity<String> addToMeter(@PathVariable int id,@PathVariable String meterId, @RequestBody Double meterValue){
+        Client currentClient = clientDatabase.get(id);
+        if(currentClient == null) return new ResponseEntity<>("Client not found", HttpStatus.NOT_FOUND); // returns 404 -> client not found
+        currentClient.appendMeter(meterId)
+        return new ResponseEntity<>("Meter updated succesfully!", HttpStatus.OK);
+    }
 }

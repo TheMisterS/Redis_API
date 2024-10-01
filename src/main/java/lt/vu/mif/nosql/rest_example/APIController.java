@@ -73,10 +73,29 @@ public class APIController {
 
 
     @PostMapping("/{id}/meter/{meterId}/add")
-    public ResponseEntity<String> addToMeter(@PathVariable int id,@PathVariable String meterId, @RequestBody Double meterValue){
+    public ResponseEntity<String> addToMeter(@PathVariable int id,@PathVariable String meterId, @RequestBody String meterValue){
+        double meterValueDouble;
+
+        try {
+            meterValueDouble = Double.parseDouble(meterValue);
+        } catch (NumberFormatException e) {
+            return new ResponseEntity<>("Invalid input (must be a number)", HttpStatus.BAD_REQUEST);
+        }
+        if(meterValueDouble <= 0) return new ResponseEntity<>("Invalid input(value has to be >=0)", HttpStatus.BAD_REQUEST); // returns 400 -> bad request
+
         Client currentClient = clientDatabase.get(id);
         if(currentClient == null) return new ResponseEntity<>("Client not found", HttpStatus.NOT_FOUND); // returns 404 -> client not found
-        currentClient.appendMeter(meterId)
+        currentClient.appendMeter(meterId, currentClient.getMeterValue(meterId)+ meterValueDouble);
         return new ResponseEntity<>("Meter updated succesfully!", HttpStatus.OK);
     }
+
+    @GetMapping("{id}/meter")
+    public ResponseEntity<Object> getMeters(@PathVariable int id){
+        Client currentClient = clientDatabase.get(id);
+        if(currentClient == null) return new ResponseEntity<>("Client not found", HttpStatus.NOT_FOUND); // returns 404 -> client not found
+
+        return new ResponseEntity<>(currentClient.getMeters().keySet(), HttpStatus.OK);
+    }
 }
+
+

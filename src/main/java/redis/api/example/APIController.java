@@ -1,30 +1,23 @@
-package lt.vu.mif.nosql.rest_example;
+package redis.api.example;
 
-import lt.vu.mif.nosql.rest_example.dto.Client;
-import lt.vu.mif.nosql.rest_example.dto.Meter;
+import redis.api.example.dto.Client;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import redis.clients.jedis.JedisPool;
 
-
-
 @RestController
 @RequestMapping("/client")
 public class APIController {
-    
-    // Connects to Redis, assuming Redis is running on the same machine
-    // (incl. exposed via Docker) with default port 6379
-    private JedisPool jedisPool = new JedisPool("localhost", 6379);
 
+    private JedisPool jedisPool = new JedisPool("localhost", 6379);
     private Map<Integer, Client> clientDatabase = new HashMap<>();
-    private int currentId = 0;
+    private int currentId = 1;
 
     @PutMapping
     public ResponseEntity<String> registerClient(@RequestBody Client client) {
@@ -37,13 +30,15 @@ public class APIController {
     public ResponseEntity<Client> getClientById(@PathVariable int id) {
         Client client = clientDatabase.get(id);
 
-        if (client == null) {    // Checking if the client exists
+        if (client == null) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND); // returns 404 -> client not found
         }
 
         return new ResponseEntity<>(client, HttpStatus.OK);
     }
 
+
+    // after deletion id is not used anymore, could be improved.
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteClientById(@PathVariable int id) {
         Client client = clientDatabase.get(id);
@@ -73,7 +68,7 @@ public class APIController {
 
 
     @PostMapping("/{id}/meter/{meterId}/add")
-    public ResponseEntity<String> addToMeter(@PathVariable int id,@PathVariable String meterId, @RequestBody String meterValue){
+        public ResponseEntity<String> addToMeter(@PathVariable int id,@PathVariable String meterId, @RequestBody String meterValue){
         double meterValueDouble;
 
         try {
@@ -95,6 +90,14 @@ public class APIController {
         if(currentClient == null) return new ResponseEntity<>("Client not found", HttpStatus.NOT_FOUND); // returns 404 -> client not found
 
         return new ResponseEntity<>(currentClient.getMeters().keySet(), HttpStatus.OK);
+    }
+
+    @GetMapping("/{id}/meter/{meterId}")
+    public ResponseEntity<Object> getMeterReading(@PathVariable int id, @PathVariable String meterId){
+        Client currentClient = clientDatabase.get(id);
+        if(currentClient == null) return new ResponseEntity<>("Client not found", HttpStatus.NOT_FOUND); // returns 404 -> client not found
+        if(currentClient.getMeterValue(meterId) == null) return new ResponseEntity<>("Meter not found", HttpStatus.NOT_FOUND); // returns 404 -> meter not found
+        return new ResponseEntity<>(currentClient.getMeterValue(meterId), HttpStatus.OK);
     }
 }
 

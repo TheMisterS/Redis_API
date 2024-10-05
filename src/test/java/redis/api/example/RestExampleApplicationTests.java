@@ -1,4 +1,4 @@
-package lt.vu.mif.nosql.rest_example;
+package redis.api.example;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

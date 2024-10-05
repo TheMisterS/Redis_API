@@ -1,4 +1,4 @@
-package lt.vu.mif.nosql.rest_example;
+package redis.api.example;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

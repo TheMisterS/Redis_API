@@ -1,6 +1,10 @@
 package redis.api.example;
 
 import redis.api.example.dto.Client;
+import redis.api.example.exceptions.ClientNotFoundException;
+import redis.api.example.exceptions.InvalidMeterValueException;
+import redis.api.example.exceptions.MeterNotFoundException;
+
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -16,7 +20,7 @@ import redis.clients.jedis.JedisPool;
 public class APIController {
 
     private JedisPool jedisPool = new JedisPool("localhost", 6379);
-    private Map<Integer, Client> clientDatabase = new HashMap<>();
+    private Map<Integer, Client> clientDatabase = new HashMap<>(); // not multithread safe, could cause incosistency issues
     private int currentId = 1;
 
     @PutMapping
@@ -31,7 +35,8 @@ public class APIController {
         Client client = clientDatabase.get(id);
 
         if (client == null) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND); // returns 404 -> client not found
+            //return new ResponseEntity<>(HttpStatus.NOT_FOUND); // returns 404 -> client not found
+            throw new ClientNotFoundException(id); // returns 404 -> client not found
         }
 
         return new ResponseEntity<>(client, HttpStatus.OK);
@@ -43,7 +48,8 @@ public class APIController {
     public ResponseEntity<String> deleteClientById(@PathVariable int id) {
         Client client = clientDatabase.get(id);
         if (client == null) {
-            return new ResponseEntity<>("Client not found", HttpStatus.NOT_FOUND); // returns 404 -> client not found
+            //return new ResponseEntity<>("Client not found", HttpStatus.NOT_FOUND); // returns 404 -> client not found
+            throw new ClientNotFoundException(id); // returns 404 -> client not found
         }
 
         clientDatabase.remove(id);
@@ -54,7 +60,8 @@ public class APIController {
     public ResponseEntity<String> appendMeter(@PathVariable int id,@PathVariable String meterId, @RequestBody String meterValue){
         Client currentClient = clientDatabase.get(id);
         if (currentClient == null) {
-            return new ResponseEntity<>("Client not found", HttpStatus.NOT_FOUND); // returns 404 -> client not found
+            //return new ResponseEntity<>("Client not found", HttpStatus.NOT_FOUND); // returns 404 -> client not found
+            throw new ClientNotFoundException(id); // returns 404 -> client not found
         } else if(currentClient.appendMeter(meterId, Double.parseDouble(meterValue))) {  //new meter created
                                                                                           //!!!!!!!!! need to improve parsing to make sense of lithuanian double standart
             clientDatabase.put(id, currentClient);
@@ -74,12 +81,15 @@ public class APIController {
         try {
             meterValueDouble = Double.parseDouble(meterValue);
         } catch (NumberFormatException e) {
-            return new ResponseEntity<>("Invalid input (must be a number)", HttpStatus.BAD_REQUEST);
+            //return new ResponseEntity<>("Invalid input (must be a number)", HttpStatus.BAD_REQUEST);
+            throw new InvalidMeterValueException(meterValue);
         }
-        if(meterValueDouble <= 0) return new ResponseEntity<>("Invalid input(value has to be >=0)", HttpStatus.BAD_REQUEST); // returns 400 -> bad request
+        if(meterValueDouble <= 0) throw new InvalidMeterValueException(meterValueDouble);
+            //return new ResponseEntity<>("Invalid input(value has to be >=0)", HttpStatus.BAD_REQUEST); // returns 400 -> bad request
 
         Client currentClient = clientDatabase.get(id);
-        if(currentClient == null) return new ResponseEntity<>("Client not found", HttpStatus.NOT_FOUND); // returns 404 -> client not found
+        if(currentClient == null) throw  new ClientNotFoundException(id); // returns 404 -> client not found
+        //return new ResponseEntity<>("Client not found", HttpStatus.NOT_FOUND); // returns 404 -> client not found
         currentClient.appendMeter(meterId, currentClient.getMeterValue(meterId)+ meterValueDouble);
         return new ResponseEntity<>("Meter updated succesfully!", HttpStatus.OK);
     }
@@ -87,7 +97,8 @@ public class APIController {
     @GetMapping("{id}/meter")
     public ResponseEntity<Object> getMeters(@PathVariable int id){
         Client currentClient = clientDatabase.get(id);
-        if(currentClient == null) return new ResponseEntity<>("Client not found", HttpStatus.NOT_FOUND); // returns 404 -> client not found
+        if(currentClient == null) throw new ClientNotFoundException(id); // returns 404 -> client not found
+            //return new ResponseEntity<>("Client not found", HttpStatus.NOT_FOUND); // returns 404 -> client not found
 
         return new ResponseEntity<>(currentClient.getMeters().keySet(), HttpStatus.OK);
     }
@@ -95,8 +106,10 @@ public class APIController {
     @GetMapping("/{id}/meter/{meterId}")
     public ResponseEntity<Object> getMeterReading(@PathVariable int id, @PathVariable String meterId){
         Client currentClient = clientDatabase.get(id);
-        if(currentClient == null) return new ResponseEntity<>("Client not found", HttpStatus.NOT_FOUND); // returns 404 -> client not found
-        if(currentClient.getMeterValue(meterId) == null) return new ResponseEntity<>("Meter not found", HttpStatus.NOT_FOUND); // returns 404 -> meter not found
+        if(currentClient == null) throw new ClientNotFoundException(id); // returns 404 -> client not found
+            //return new ResponseEntity<>("Client not found", HttpStatus.NOT_FOUND); // returns 404 -> client not found
+        if(currentClient.getMeterValue(meterId) == null) throw new MeterNotFoundException(); // returns 404 -> meter not found
+            //return new ResponseEntity<>("Meter not found", HttpStatus.NOT_FOUND); // returns 404 -> meter not found
         return new ResponseEntity<>(currentClient.getMeterValue(meterId), HttpStatus.OK);
     }
 }

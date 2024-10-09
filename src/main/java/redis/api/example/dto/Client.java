@@ -1,6 +1,7 @@
 package redis.api.example.dto;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.redis.core.RedisHash;
@@ -14,9 +15,9 @@ public class Client {
 
 
     private  int id;
-    HashMap<String, Double> meters;
+    Map<String, Double> meters;
 
-    public Client(String fullName, String address, int id, HashMap<String, Double> meters) {
+    public Client(String fullName, String address, int id, Map<String, Double> meters) {
         this.fullName = fullName;
         this.address = address;
         this.id = id;
@@ -50,20 +51,22 @@ public class Client {
         this.id = id;
     }
 
-    public Client(HashMap<String, Double> meters) {
+    public Client(Map<String, Double> meters) {
         this.meters = meters;
     }
 
-    public HashMap<String, Double> getMeters() {
+    public Map<String, Double> getMeters() {
         return meters;
     }
 
-    public void setMeters(HashMap<String, Double> meters) {
+    public void setMeters(Map<String, Double> meters) {
         this.meters = meters;
     }
 
     public  boolean appendMeter (String meterID, double meterValue){
-        if(this.meters.put(meterID, meterValue) == null){ // new value added
+        if(meters == null){
+            return false;
+        } else if(this.meters.put(meterID, meterValue) == null){ // new value added
             return true;
         }else { // value updated
             return false;

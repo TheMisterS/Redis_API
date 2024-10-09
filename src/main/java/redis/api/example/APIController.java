@@ -47,9 +47,12 @@ public class APIController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Client> getClientById(@PathVariable int id) throws IOException {
+    public ResponseEntity<?> getClientById(@PathVariable int id) throws IOException {
         Jedis jedis = jedisPool.getResource();
         String clientKey = "client:" + String.valueOf(id);
+        if (jedis.get(String.valueOf(clientKey)) == null) {
+            throw new ClientNotFoundException(id);
+        }
         String clientJson = jedis.get(String.valueOf(clientKey));
 
         ObjectMapper objectMapper = new ObjectMapper();
@@ -57,38 +60,49 @@ public class APIController {
         return new ResponseEntity<>(client, HttpStatus.OK);
     }
 
-/*
+
     // after deletion id is not used anymore, could be improved.
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteClientById(@PathVariable int id) {
-        Client client = clientDatabase.get(id);
-        if (client == null) {
-            //return new ResponseEntity<>("Client not found", HttpStatus.NOT_FOUND); // returns 404 -> client not found
-            throw new ClientNotFoundException(id); // returns 404 -> client not found
+        Jedis jedis = jedisPool.getResource();
+        String clientKey = "client:" + String.valueOf(id);
+        if (jedis.get(String.valueOf(clientKey)) == null) {
+            throw new ClientNotFoundException(id);
         }
-
-        clientDatabase.remove(id);
+        jedis.del(clientKey);
         return new ResponseEntity<>("Client deleted successfully", HttpStatus.OK); // returns 200 -> OK
     }
 
     @PostMapping("/{id}/meter/{meterId}")
-    public ResponseEntity<String> appendMeter(@PathVariable int id,@PathVariable String meterId, @RequestBody String meterValue){
-        Client currentClient = clientDatabase.get(id);
-        if (currentClient == null) {
-            //return new ResponseEntity<>("Client not found", HttpStatus.NOT_FOUND); // returns 404 -> client not found
-            throw new ClientNotFoundException(id); // returns 404 -> client not found
-        } else if(currentClient.appendMeter(meterId, Double.parseDouble(meterValue))) {  //new meter created
-                                                                                          //!!!!!!!!! need to improve parsing to make sense of lithuanian double standart
-            clientDatabase.put(id, currentClient);
-            return new ResponseEntity<>("New meter created succesfully!", HttpStatus.OK);
+    public ResponseEntity<String> appendMeter(@PathVariable int id,@PathVariable String meterId, @RequestBody String meterValue) throws JsonProcessingException {
 
+        //check if it is a double
+        try {
+            double meterValueDouble = Double.parseDouble(meterValue);
+        } catch (NumberFormatException e) {
+            throw new InvalidMeterValueException(meterValue);
         }
-        // else, meter is updated
-        return new ResponseEntity<>("Meter updated succesfully!", HttpStatus.OK);
+        Jedis jedis = jedisPool.getResource();
+        String clientKey = "client:" + String.valueOf(id);
+
+        if (jedis.get(String.valueOf(clientKey)) == null) {
+            throw new ClientNotFoundException(id);
+        }
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        String clientJson = jedis.get(String.valueOf(clientKey));
+        Client client = objectMapper.readValue(clientJson, Client.class);
+        String  meterKey = "client:" + String.valueOf(id) + ":meter:" + meterId;
+        jedis.set(meterKey, meterValue);
+
+        // keeps track of the meter list for each client for GET requests
+        jedis.sadd("client:" + id + ":meters", meterId);
+
+        return new ResponseEntity<>("Meter appended succesfully!", HttpStatus.OK);
 
     }
 
-
+/*
     @PostMapping("/{id}/meter/{meterId}/add")
         public ResponseEntity<String> addToMeter(@PathVariable int id,@PathVariable String meterId, @RequestBody String meterValue){
         double meterValueDouble;

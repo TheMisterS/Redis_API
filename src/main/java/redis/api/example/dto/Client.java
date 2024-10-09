@@ -23,7 +23,8 @@ public class Client {
         this.meters = meters;
     }
 
-
+    public Client() {
+    }
 
     public String getAddress() {
         return address;

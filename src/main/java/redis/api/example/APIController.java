@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -44,20 +45,19 @@ public class APIController {
         return new ResponseEntity<>("Client registered with the ID: " + client.getId(), HttpStatus.OK); //returns 200 -> OK
 
     }
-/*
+
     @GetMapping("/{id}")
-    public ResponseEntity<Client> getClientById(@PathVariable int id) {
-        Client client = clientDatabase.get(id);
+    public ResponseEntity<Client> getClientById(@PathVariable int id) throws IOException {
+        Jedis jedis = jedisPool.getResource();
+        String clientKey = "client:" + String.valueOf(id);
+        String clientJson = jedis.get(String.valueOf(clientKey));
 
-        if (client == null) {
-            //return new ResponseEntity<>(HttpStatus.NOT_FOUND); // returns 404 -> client not found
-            throw new ClientNotFoundException(id); // returns 404 -> client not found
-        }
-
+        ObjectMapper objectMapper = new ObjectMapper();
+        Client client = objectMapper.readValue(clientJson, Client.class);
         return new ResponseEntity<>(client, HttpStatus.OK);
     }
 
-
+/*
     // after deletion id is not used anymore, could be improved.
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteClientById(@PathVariable int id) {

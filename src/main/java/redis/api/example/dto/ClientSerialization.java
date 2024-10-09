@@ -12,7 +12,7 @@ public class ClientSerialization {
         return objectMapper.writeValueAsString(inputObj);
     }
 
-    public static <T> T deserialize(String jsonString, Class<T> outputClass) throws IOException {
-        return objectMapper.readValue(jsonString, outputClass);
+    public static <T> Object deserialize(String jsonString, Client client) throws IOException {
+        return objectMapper.readValue(jsonString, client.getClass() );
     }
 }

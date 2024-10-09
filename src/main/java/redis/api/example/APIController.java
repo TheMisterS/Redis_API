@@ -1,11 +1,15 @@
 package redis.api.example;
 
-import redis.api.example.dto.Client;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import org.springframework.beans.factory.annotation.Autowired;
+import redis.api.example.dto.*;
 import redis.api.example.exceptions.ClientNotFoundException;
 import redis.api.example.exceptions.InvalidMeterValueException;
 import redis.api.example.exceptions.MeterNotFoundException;
 
 import org.springframework.web.bind.annotation.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 
 import java.util.HashMap;
 import java.util.Map;
@@ -13,6 +17,7 @@ import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 
 @RestController
@@ -20,16 +25,26 @@ import redis.clients.jedis.JedisPool;
 public class APIController {
 
     private JedisPool jedisPool = new JedisPool("localhost", 6379);
-    private Map<Integer, Client> clientDatabase = new HashMap<>(); // not multithread safe, could cause incosistency issues
-    private int currentId = 1;
+//    private Map<Integer, Client> clientDatabase = new HashMap<>(); // not multithread safe, could cause incosistency issues
+ //   private int currentId = 1;
+
 
     @PutMapping
-    public ResponseEntity<String> registerClient(@RequestBody Client client) {
-        client.setId(currentId++);
-        clientDatabase.put(client.getId(), client);
-        return new ResponseEntity<>("Client registered with the ID: " + client.getId(), HttpStatus.OK); //returns 200 -> OK
-    }
+    public ResponseEntity<String> registerClient(@RequestBody Client client) throws JsonProcessingException {
+        Jedis jedis = jedisPool.getResource();
 
+        long nextId = jedis.incr("client:id:counter");
+        client.setId((int)nextId);
+
+
+        String clientJson = ClientSerialization.serialize(client);
+        String clientKey = "client:" + client.getId();
+        jedis.set(clientKey, clientJson);
+
+        return new ResponseEntity<>("Client registered with the ID: " + client.getId(), HttpStatus.OK); //returns 200 -> OK
+
+    }
+/*
     @GetMapping("/{id}")
     public ResponseEntity<Client> getClientById(@PathVariable int id) {
         Client client = clientDatabase.get(id);
@@ -112,6 +127,8 @@ public class APIController {
             //return new ResponseEntity<>("Meter not found", HttpStatus.NOT_FOUND); // returns 404 -> meter not found
         return new ResponseEntity<>(currentClient.getMeterValue(meterId), HttpStatus.OK);
     }
+
+ */
 }
 
 

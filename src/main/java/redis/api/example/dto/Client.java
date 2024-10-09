@@ -2,20 +2,28 @@ package redis.api.example.dto;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+import org.springframework.data.annotation.Id;
+import org.springframework.data.redis.core.RedisHash;
+
+
+
 public class Client {
 
     private String fullName;
     private String address;
-    private  int id = 1;
+
+
+    private  int id;
     HashMap<String, Double> meters;
 
-
-    public Client(String address, String fullName) {
-        this.address = address;
+    public Client(String fullName, String address, int id, HashMap<String, Double> meters) {
         this.fullName = fullName;
-        id++;
-        meters = new HashMap<String, Double>();
+        this.address = address;
+        this.id = id;
+        this.meters = meters;
     }
+
+
 
     public String getAddress() {
         return address;

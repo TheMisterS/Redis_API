@@ -15,13 +15,11 @@ public class Client {
 
 
     private  int id;
-    Map<String, Double> meters;
 
-    public Client(String fullName, String address, int id, Map<String, Double> meters) {
+    public Client(String fullName, String address, int id) {
         this.fullName = fullName;
         this.address = address;
         this.id = id;
-        this.meters = meters;
     }
 
     public Client() {
@@ -51,35 +49,4 @@ public class Client {
         this.id = id;
     }
 
-    public Client(Map<String, Double> meters) {
-        this.meters = meters;
-    }
-
-    public Map<String, Double> getMeters() {
-        return meters;
-    }
-
-    public void setMeters(Map<String, Double> meters) {
-        this.meters = meters;
-    }
-
-    public  boolean appendMeter (String meterID, double meterValue){
-        if(meters == null){
-            return false;
-        } else if(this.meters.put(meterID, meterValue) == null){ // new value added
-            return true;
-        }else { // value updated
-            return false;
-        }
-    }
-
-    public Double getMeterValue (String meterID){
-        return this.meters.get(meterID);
-    }
-/* WIP
-    public void removeMeter(String meterID){
-        return this.meters.remove(meterID);
-    }
-
- */
 }

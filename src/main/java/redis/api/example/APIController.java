@@ -27,9 +27,6 @@ import redis.clients.jedis.JedisPool;
 public class APIController {
 
     private JedisPool jedisPool = new JedisPool("localhost", 6379);
-//    private Map<Integer, Client> clientDatabase = new HashMap<>(); // not multithread safe, could cause incosistency issues
- //   private int currentId = 1;
-
 
     @PutMapping
     public ResponseEntity<String> registerClient(@RequestBody Client client) throws JsonProcessingException {
@@ -49,29 +46,32 @@ public class APIController {
 
     @GetMapping("/{id}")
     public ResponseEntity<?> getClientById(@PathVariable int id) throws IOException {
-        Jedis jedis = jedisPool.getResource();
-        String clientKey = "client:" + String.valueOf(id);
-        if (jedis.get(String.valueOf(clientKey)) == null) {
-            throw new ClientNotFoundException(id);
-        }
-        String clientJson = jedis.get(String.valueOf(clientKey));
 
-        ObjectMapper objectMapper = new ObjectMapper();
-        Client client = objectMapper.readValue(clientJson, Client.class);
-        return new ResponseEntity<>(client, HttpStatus.OK);
+       try( Jedis jedis = jedisPool.getResource()) {
+           String clientKey = "client:" + String.valueOf(id);
+           if (jedis.get(String.valueOf(clientKey)) == null) {
+               throw new ClientNotFoundException(id);
+           }
+           String clientJson = jedis.get(String.valueOf(clientKey));
+
+           ObjectMapper objectMapper = new ObjectMapper();
+           Client client = objectMapper.readValue(clientJson, Client.class);
+           return new ResponseEntity<>(client, HttpStatus.OK);
+       }
     }
 
 
     // after deletion id is not used anymore, could be improved.
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteClientById(@PathVariable int id) {
-        Jedis jedis = jedisPool.getResource();
-        String clientKey = "client:" + String.valueOf(id);
-        if (jedis.get(String.valueOf(clientKey)) == null) {
-            throw new ClientNotFoundException(id);
+        try (Jedis jedis = jedisPool.getResource()) {
+            String clientKey = "client:" + String.valueOf(id);
+            if (jedis.get(String.valueOf(clientKey)) == null) {
+                throw new ClientNotFoundException(id);
+            }
+            jedis.del(clientKey);
+            return new ResponseEntity<>("Client deleted successfully", HttpStatus.OK); // returns 200 -> OK
         }
-        jedis.del(clientKey);
-        return new ResponseEntity<>("Client deleted successfully", HttpStatus.OK); // returns 200 -> OK
     }
 
     @PostMapping("/{id}/meter/{meterId}")
@@ -83,24 +83,24 @@ public class APIController {
         } catch (NumberFormatException e) {
             throw new InvalidMeterValueException(meterValue);
         }
-        Jedis jedis = jedisPool.getResource();
-        String clientKey = "client:" + String.valueOf(id);
+       try( Jedis jedis = jedisPool.getResource()) {
+           String clientKey = "client:" + String.valueOf(id);
 
-        if (jedis.get(String.valueOf(clientKey)) == null) {
-            throw new ClientNotFoundException(id);
-        }
+           if (jedis.get(String.valueOf(clientKey)) == null) {
+               throw new ClientNotFoundException(id);
+           }
 
-        ObjectMapper objectMapper = new ObjectMapper();
-        String clientJson = jedis.get(String.valueOf(clientKey));
-        Client client = objectMapper.readValue(clientJson, Client.class);
-        String  meterKey = "client:" + String.valueOf(id) + ":meter:" + meterId;
-        jedis.set(meterKey, meterValue);
+           ObjectMapper objectMapper = new ObjectMapper();
+           String clientJson = jedis.get(String.valueOf(clientKey));
+           Client client = objectMapper.readValue(clientJson, Client.class);
+           String meterKey = "client:" + String.valueOf(id) + ":meter:" + meterId;
+           jedis.set(meterKey, meterValue);
 
-        // keeps track of the meter list for each client for GET requests
-        jedis.sadd("client:" + id + ":meters", meterId);
+           // keeps track of the meter list for each client for GET requests
+           jedis.sadd("client:" + id + ":meters", meterId);
 
-        return new ResponseEntity<>("Meter appended succesfully!", HttpStatus.OK);
-
+           return new ResponseEntity<>("Meter appended succesfully!", HttpStatus.OK);
+       }
     }
 
 
@@ -115,54 +115,59 @@ public class APIController {
         }
         if(meterValueDouble <= 0) throw new InvalidMeterValueException(meterValueDouble);
 
-        Jedis jedis = jedisPool.getResource();
-        String clientKey = "client:" + String.valueOf(id);
-        String meterKey = "client:" + id + ":meter:" + meterId;
+        try (Jedis jedis = jedisPool.getResource()) {
+            String clientKey = "client:" + String.valueOf(id);
+            String meterKey = "client:" + id + ":meter:" + meterId;
 
-        if (jedis.get(clientKey) == null) {
-            throw new ClientNotFoundException(id);
+            if (jedis.get(clientKey) == null) {
+                throw new ClientNotFoundException(id);
+            }
+            if(jedis.get(meterKey) == null){
+                throw new MeterNotFoundException();
+            }
+
+            String currentMeterValue = jedis.get(meterKey);
+
+            double updatedMeterValue = Double.parseDouble(currentMeterValue) + meterValueDouble;
+            jedis.set(meterKey, String.valueOf(updatedMeterValue));
+
+            return new ResponseEntity<>("Meter updated succesfully!", HttpStatus.OK);
         }
-
-        String currentMeterValue = jedis.get(meterKey);
-
-        double updatedMeterValue = Double.parseDouble(currentMeterValue) + meterValueDouble;
-        jedis.set(meterKey, String.valueOf(updatedMeterValue));
-
-        return new ResponseEntity<>("Meter updated succesfully!", HttpStatus.OK);
     }
 
 
     @GetMapping("{id}/meter")
     public ResponseEntity<?> getMeters(@PathVariable int id){
 
-        Jedis jedis = jedisPool.getResource();
-        String clientKey = "client:" + String.valueOf(id);
+        try (Jedis jedis = jedisPool.getResource()) {
+            String clientKey = "client:" + String.valueOf(id);
 
-        if (jedis.get(clientKey) == null) {
-            throw new ClientNotFoundException(id);
+            if (jedis.get(clientKey) == null) {
+                throw new ClientNotFoundException(id);
+            }
+
+            Set<String> meterIds = jedis.smembers("client:" + id + ":meters"); // get client's meter IDs
+            return new ResponseEntity<>(meterIds, HttpStatus.OK);
         }
-
-        Set<String> meterIds = jedis.smembers("client:" + id + ":meters"); // get client's meter IDs
-        return new ResponseEntity<>(meterIds, HttpStatus.OK);
-
     }
 
     @GetMapping("/{id}/meter/{meterId}")
     public ResponseEntity<?> getMeterReading(@PathVariable int id, @PathVariable String meterId){
 
-        Jedis jedis = jedisPool.getResource();
-        String clientKey = "client:" + String.valueOf(id);
-        String meterKey = "client:" + String.valueOf(id) + ":meter:" + meterId;
+        try(Jedis jedis = jedisPool.getResource()) {
+            String clientKey = "client:" + String.valueOf(id);
+            String meterKey = "client:" + String.valueOf(id) + ":meter:" + meterId;
 
-        if (jedis.get(clientKey) == null) {
-            throw new ClientNotFoundException(id);
-        }
-        if (jedis.get(meterKey) == null) {
-            throw new MeterNotFoundException();
-        }
+            if (jedis.get(clientKey) == null) {
+                throw new ClientNotFoundException(id);
+            }
+            if (jedis.get(meterKey) == null) {
+                throw new MeterNotFoundException();
+            }
 
-        String meterValue = jedis.get(meterKey);
-        return new ResponseEntity<>(meterValue, HttpStatus.OK);
+            String meterValue = jedis.get(meterKey);
+            return new ResponseEntity<>(meterValue, HttpStatus.OK);
+        }
     }
 }
 

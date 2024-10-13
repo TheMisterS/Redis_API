@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -102,47 +103,67 @@ public class APIController {
 
     }
 
-/*
-    @PostMapping("/{id}/meter/{meterId}/add")
-        public ResponseEntity<String> addToMeter(@PathVariable int id,@PathVariable String meterId, @RequestBody String meterValue){
-        double meterValueDouble;
 
+    @PostMapping("/{id}/meter/{meterId}/add")
+    public ResponseEntity<String> addToMeter(@PathVariable int id,@PathVariable String meterId, @RequestBody String meterValue){
+
+        double meterValueDouble;
         try {
             meterValueDouble = Double.parseDouble(meterValue);
         } catch (NumberFormatException e) {
-            //return new ResponseEntity<>("Invalid input (must be a number)", HttpStatus.BAD_REQUEST);
             throw new InvalidMeterValueException(meterValue);
         }
         if(meterValueDouble <= 0) throw new InvalidMeterValueException(meterValueDouble);
-            //return new ResponseEntity<>("Invalid input(value has to be >=0)", HttpStatus.BAD_REQUEST); // returns 400 -> bad request
 
-        Client currentClient = clientDatabase.get(id);
-        if(currentClient == null) throw  new ClientNotFoundException(id); // returns 404 -> client not found
-        //return new ResponseEntity<>("Client not found", HttpStatus.NOT_FOUND); // returns 404 -> client not found
-        currentClient.appendMeter(meterId, currentClient.getMeterValue(meterId)+ meterValueDouble);
+        Jedis jedis = jedisPool.getResource();
+        String clientKey = "client:" + String.valueOf(id);
+        String meterKey = "client:" + id + ":meter:" + meterId;
+
+        if (jedis.get(clientKey) == null) {
+            throw new ClientNotFoundException(id);
+        }
+
+        String currentMeterValue = jedis.get(meterKey);
+
+        double updatedMeterValue = Double.parseDouble(currentMeterValue) + meterValueDouble;
+        jedis.set(meterKey, String.valueOf(updatedMeterValue));
+
         return new ResponseEntity<>("Meter updated succesfully!", HttpStatus.OK);
     }
 
-    @GetMapping("{id}/meter")
-    public ResponseEntity<Object> getMeters(@PathVariable int id){
-        Client currentClient = clientDatabase.get(id);
-        if(currentClient == null) throw new ClientNotFoundException(id); // returns 404 -> client not found
-            //return new ResponseEntity<>("Client not found", HttpStatus.NOT_FOUND); // returns 404 -> client not found
 
-        return new ResponseEntity<>(currentClient.getMeters().keySet(), HttpStatus.OK);
+    @GetMapping("{id}/meter")
+    public ResponseEntity<?> getMeters(@PathVariable int id){
+
+        Jedis jedis = jedisPool.getResource();
+        String clientKey = "client:" + String.valueOf(id);
+
+        if (jedis.get(clientKey) == null) {
+            throw new ClientNotFoundException(id);
+        }
+
+        Set<String> meterIds = jedis.smembers("client:" + id + ":meters"); // get client's meter IDs
+        return new ResponseEntity<>(meterIds, HttpStatus.OK);
+
     }
 
     @GetMapping("/{id}/meter/{meterId}")
-    public ResponseEntity<Object> getMeterReading(@PathVariable int id, @PathVariable String meterId){
-        Client currentClient = clientDatabase.get(id);
-        if(currentClient == null) throw new ClientNotFoundException(id); // returns 404 -> client not found
-            //return new ResponseEntity<>("Client not found", HttpStatus.NOT_FOUND); // returns 404 -> client not found
-        if(currentClient.getMeterValue(meterId) == null) throw new MeterNotFoundException(); // returns 404 -> meter not found
-            //return new ResponseEntity<>("Meter not found", HttpStatus.NOT_FOUND); // returns 404 -> meter not found
-        return new ResponseEntity<>(currentClient.getMeterValue(meterId), HttpStatus.OK);
-    }
+    public ResponseEntity<?> getMeterReading(@PathVariable int id, @PathVariable String meterId){
 
- */
+        Jedis jedis = jedisPool.getResource();
+        String clientKey = "client:" + String.valueOf(id);
+        String meterKey = "client:" + String.valueOf(id) + ":meter:" + meterId;
+
+        if (jedis.get(clientKey) == null) {
+            throw new ClientNotFoundException(id);
+        }
+        if (jedis.get(meterKey) == null) {
+            throw new MeterNotFoundException();
+        }
+
+        String meterValue = jedis.get(meterKey);
+        return new ResponseEntity<>(meterValue, HttpStatus.OK);
+    }
 }
 
 
